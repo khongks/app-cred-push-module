@@ -1,0 +1,347 @@
+<?php
+
+/**
+ * @file
+ * Hooks related to IBM APIC.
+ */
+
+/*
+ * Hooks related to IBM APIC Applications.
+ */
+
+/**
+ * Implementation of hook_apic_app_create() to log when an app is created
+ * @param NodeInterface $node
+ *   The Drupal node representing this application
+ * @param array $app
+ *   The array of data returned by API Manager
+ */
+function app_cred_push_apic_app_create($node, $app) {
+  $current = \Drupal::state()->get('app_cred_push.apic_app_create');
+  $current[] = 'app created '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.apic_app_create', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_create hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_create app created @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create org=@org_url', ['@org_url' => $app['org_url']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create appId=@appId', ['@appId' => $app['id']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create appName=@appName', ['@appName' => $app['name']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create appTitle=@appTitle', ['@appTitle' => $app['title']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create client_id=@client_id', ['@client_id' => $app['client_id']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_create client_secret=@client_secret', ['@client_secret' => $app['client_secret']]);
+  
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps';
+  $body['id'] = $app['id'];
+  $body['name'] = $app['name'];
+  $body['title'] = $app['title'];
+  // get credId
+  $parts = explode('/', $app['app_credential_urls'][0]);
+  $credId = array_pop($parts);
+  // create credential object  
+  $credential['id'] = $credId;
+  $credential['client_id'] = $app['client_id'];
+  $credential['client_secret'] = $app['client_secret'];
+  $body['credential'] = $credential;
+  $body['redirect_endpoints'] = $app['redirect_endpoints'];
+  
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_create http requesting ...');
+    $res = $client->post($url, [ 
+    	'headers' => [
+    	  	'Content-Type' => 'application/json',
+    	  	'Accept' => 'application/json'
+    	],
+    	'body' => json_encode($body) 
+    ]);
+    $code = $res->getStatusCode();
+    if ($code == 200 OR $code == 201) {
+      \Drupal::logger('app_cred_push')->info('apic_app_create response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_update http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_update() to log when an app is updated
+ */
+function app_cred_push_apic_app_update($node, $app) {
+  $current = \Drupal::state()->get('app_cred_push.apic_app_update');
+  $current[] = 'app updated '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.apic_app_update', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_update hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_update app updated @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_update org @org_url', ['@org_url' => $app['org_url']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_update appId=@appId', ['@appId' => $app['id']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_update appName=@appName', ['@appName' => $app['name']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_update appTitle=@appTitle', ['@appTitle' => $app['title']]);
+  
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps/'.$app['id'];
+  $body['name'] = $app['name'];
+  $body['title'] = $app['title'];
+  $body['redirect_endpoints'] = $app['redirect_endpoints'];
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_update http requesting ...');
+    $res = $client->put($url, [
+    	'headers' => [
+    		'Content-Type' => 'application/json',
+    		'Accept' => 'application/json'
+    	],
+    	'body' => json_encode($body) 
+    ]);
+    $code = $res->getStatusCode();
+    if ($code == 200) {
+      \Drupal::logger('app_cred_push')->info('apic_app_update response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_update http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_delete() to log when an app is deleted
+ */
+function app_cred_push_apic_app_delete($node, $data, $appId) {
+  $current = \Drupal::state()->get('app_cred_push.apic_app_delete');
+  $current[] = 'app deleted '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.apic_app_delete', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_delete hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_delete app deleted @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_delete id=@id', ['@id' => $appId]);
+  
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps';
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_delete http requesting ...');
+    $res = $client->delete($url);
+    $code = $res->getStatusCode();
+    if ($code == 200) {
+      \Drupal::logger('app_cred_push')->info('apic_app_delete response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_delete http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_creds_create to log when a new set of credentials is created for an application
+ */
+function app_cred_push_apic_app_creds_create($node, $data, $credId) {
+  $current = \Drupal::state()->get('app_cred_push.apic_app_creds_create');
+  $current[] = 'app creds created '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.apic_app_creds_create', $current);
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_create hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_create new creds created for app @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_create credId=@credId', ['@credId' => $credId]);
+
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps/'.$appId.'/credentials/'.$credId;
+  $credential['client_id'] = $app['client_id'];
+  $credential['client_secret'] = $app['client_secret'];
+  $body['credential'] = $credential;
+  
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_creds_create http requesting ...');
+    $res = $client->post($url, [ 
+    	'headers' => [
+    	  	'Content-Type' => 'application/json',
+    	  	'Accept' => 'application/json'
+    	],
+    	'body' => json_encode($body) 
+    ]);
+    $code = $res->getStatusCode();
+    if ($code == 200 OR $code == 201) {
+      \Drupal::logger('app_cred_push')->info('apic_app_creds_create response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_creds_create http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_creds_update to log when a new set of credentials is updated for an application
+ */
+function app_cred_push_apic_app_creds_update($node, $data, $credId) {
+  $current = \Drupal::state()->get('app_cred_push.app_creds_update');
+  $current[] = 'app creds updated '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.app_creds_update', $current);
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_update hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_update creds updated for app @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_update credId=@credId', ['@credId' => $credId]);
+}
+
+/**
+ * Implementation of hook_apic_app_creds_delete to log when a new set of credentials is deleted for an application
+ */
+function app_cred_push_apic_app_creds_delete($node, $data, $credId) {
+  $current = \Drupal::state()->get('app_cred_push.app_creds_delete');
+  $current[] = 'app creds deleted '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.app_creds_delete', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_delete hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_delete creds deleted for app @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_creds_delete credId=@credId', ['@credId' => $credId]);
+
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps/'.$appId.'/credentials/'.$credId;  
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_creds_delete http requesting ...');
+    $res = $client->delete($url);
+    $code = $res->getStatusCode();
+    if ($code == 200) {
+      \Drupal::logger('app_cred_push')->info('apic_app_creds_delete response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_creds_delete http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_clientid_reset to log when a credential client ID is reset
+ */
+function app_cred_push_apic_app_clientid_reset($node, $data, $appId, $credId) {
+  $current = \Drupal::state()->get('app_cred_push.app_clientid_reset');
+  $current[] = 'client id reset for '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.app_clientid_reset', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset client id reset for app @name', ['@name' => $node->getTitle()]);
+  \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset org @org_url', ['@org_url' => $app['org_url']]);
+  \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset appId=@appId', ['@appId' => $appId]);
+  \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset credId=@credId', ['@credId' => $credId]);
+  
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps/'.$appId.'/credentials/'.$credId;
+  $body['client_id'] = $data['client_id'];
+  $body['client_secret'] = $data['client_secret'];
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset http requesting ...');
+    $res = $client->put($url, [ 
+    	'headers' => [
+    		'Content-Type' => 'application/json',
+    		'Accept' => 'application/json'
+    	],
+    	'body' => json_encode($body) 
+    ]);
+    $code = $res->getStatusCode();
+    if ($code == 200) {
+      \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_clientid_reset http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Implementation of hook_apic_app_clientsecret_reset to log when a credential client secret is reset
+ */
+function app_cred_push_apic_app_clientsecret_reset($node, $data, $appId, $credId) {
+  $current = \Drupal::state()->get('app_cred_push.app_clientsecret_reset');
+  $current[] = 'client secret reset for '.$node->getTitle().' '.time();
+  \Drupal::state()->set('app_cred_push.app_clientsecret_reset', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset hook called');
+  \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset appId=@appId', ['@appId' => $appId]);
+  \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset credId=@credId', ['@credId' => $credId]);
+  
+  $hostname = "httpbin.org/anything";
+  $url = 'https://'.$hostname.'/apps/'.$appId.'/credentials/'.$credId;
+  $body['client_secret'] = $data['client_secret'];
+
+  $client = \Drupal::httpClient();
+  try {
+    \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset http requesting ...');
+    $res = $client->put($url, [ 
+    	'headers' => [
+    		'Content-Type' => 'application/json',
+    		'Accept' => 'application/json'
+    	],
+    	'body' => json_encode($body) 
+    ]);
+    $code = $res->getStatusCode();
+    if ($code == 200) {
+      \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset response_body=@body', ['@body' => $res->getBody()]);
+    } else {
+      \Drupal::logger('app_cred_push')->info('apic_app_clientsecret_reset http status code=@code', ['@code' => $code]);
+    }
+  } catch(RequestException $e) {
+    watchdog_exception('app_cred_push', $e);
+  }
+}
+
+/**
+ * Alter the client ID provided by API Manager when the ID is reset
+ *
+ * @param $data
+ * @param $appId
+ */
+function app_cred_push_apic_app_modify_client_id_reset_alter(&$data, $appId) {
+
+  $current = \Drupal::state()->get('app_cred_push.app_modify_client_id_reset_alter');
+  $current[] = 'apic_app_modify_client_id_reset_alter hook called '.time();
+  \Drupal::state()->set('app_cred_push.app_modify_client_id_reset_alter', $current);
+
+  \Drupal::logger('app_cred_push')->info('apic_app_modify_client_id_reset_alter hook called');
+}
+
+/**
+ * Alter the client secret provided by API Manager when the secret is reset
+ *
+ * @param $data
+ * @param $appId
+ */
+function app_cred_push_apic_app_modify_client_secret_reset_alter(&$data, $appId) {
+  $current = \Drupal::state()->get('app_cred_push.app_modify_client_secret_reset_alter');
+  $current[] = 'apic_app_modify_client_secret_reset_alter hook called '.time();
+  \Drupal::state()->set('app_cred_push.app_modify_client_secret_reset_alter', $current);
+
+    \Drupal::logger('app_cred_push')->info('apic_app_modify_client_secret_reset_alter hook called');
+}
+
+/**
+ * Alter the credentials provided by API Manager when a new application is created
+ *
+ * @param $data
+ * @param $appId
+ */
+function app_cred_push_apic_app_modify_create_alter(&$data, $appId) {
+  $current = \Drupal::state()->get('app_cred_push.app_modify_create_alter');
+  $current[] = 'apic_app_modify_create_alter hook called '.time();
+  \Drupal::state()->set('app_cred_push.app_modify_create_alter', $current);
+  \Drupal::logger('app_cred_push')->info('apic_app_modify_create_alter hook called');
+}
+
+/**
+ * Alter the credentials provided by API Manager when new credentials are created
+ *
+ * @param $data
+ * @param $appId
+ */
+function app_cred_push_apic_app_modify_credentials_create_alter(&$data, $appId) {
+  $current = \Drupal::state()->get('app_cred_push.app_modify_credentials_create_alter');
+  $current[] = 'apic_app_modify_credentials_create_alter hook called '.time();
+  \Drupal::state()->set('app_cred_push.app_modify_credentials_create_alter', $current);
+  \Drupal::logger('app_cred_push')->info('apic_app_modify_credentials_create_alter hook called');
+}

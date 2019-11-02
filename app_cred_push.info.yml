@@ -1,0 +1,6 @@
+name: App Credentials Push Module
+description: Send HTTP request containing application credentials when it is created or changed.
+package: Custom
+type: module
+version: 1.0
+core: 8.x
